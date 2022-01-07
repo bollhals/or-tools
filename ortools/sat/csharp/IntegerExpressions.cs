@@ -247,7 +247,7 @@ public class LinearExpr
     {
         List<LinearExpr> exprs = new List<LinearExpr>();
         List<long> coeffs = new List<long>();
-        if ((Object)e != null)
+        if (e is not null)
         {
             exprs.Add(e);
             coeffs.Add(initial_coeff);
@@ -260,7 +260,7 @@ public class LinearExpr
             exprs.RemoveAt(0);
             long coeff = coeffs[0];
             coeffs.RemoveAt(0);
-            if (coeff == 0 || (Object)expr == null)
+            if (coeff == 0 || expr is null)
                 continue;
 
             if (expr is ProductCst)
@@ -499,7 +499,7 @@ public class SumArray : LinearExpr
 
     public void AddExpr(LinearExpr expr)
     {
-        if ((Object)expr != null)
+        if (expr is not null)
         {
             expressions_.Add(expr);
         }
@@ -532,7 +532,7 @@ public class SumArray : LinearExpr
         string result = "";
         foreach (LinearExpr expr in expressions_)
         {
-            if ((Object)expr == null)
+            if (expr is null)
                 continue;
             if (!String.IsNullOrEmpty(result))
             {
@@ -583,7 +583,6 @@ public class IntVar : LinearExpr, ILiteral
 {
     public IntVar(CpModelProto model, Domain domain, string name)
     {
-        model_ = model;
         index_ = model.Variables.Count;
         var_ = new IntegerVariableProto();
         var_.Name = name;
@@ -592,9 +591,13 @@ public class IntVar : LinearExpr, ILiteral
         negation_ = null;
     }
 
+    public IntVar(CpModelProto model, long value, string name)
+        : this(model, value, value, name)
+    {
+    }
+
     public IntVar(CpModelProto model, long lb, long ub, string name)
     {
-        model_ = model;
         index_ = model.Variables.Count;
         var_ = new IntegerVariableProto();
         var_.Name = name;
@@ -606,7 +609,6 @@ public class IntVar : LinearExpr, ILiteral
 
     public IntVar(CpModelProto model, int index)
     {
-        model_ = model;
         index_ = index;
         var_ = model.Variables[index];
         negation_ = null;
@@ -641,7 +643,7 @@ public class IntVar : LinearExpr, ILiteral
 
     public override string ShortString()
     {
-        if (var_.Name != null)
+        if (var_.Name is not null)
         {
             return var_.Name;
         }
@@ -665,15 +667,11 @@ public class IntVar : LinearExpr, ILiteral
                 throw new ArgumentException("Cannot call Not() on a non boolean variable");
             }
         }
-        if (negation_ == null)
-        {
-            negation_ = new NotBooleanVariable(this);
-        }
-        return negation_;
+
+        return negation_ ??= new NotBooleanVariable(this);
     }
 
-    private CpModelProto model_;
-    private int index_;
+    private readonly int index_;
     private IntegerVariableProto var_;
     private NotBooleanVariable negation_;
 }

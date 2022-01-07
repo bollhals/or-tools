@@ -58,12 +58,12 @@ public class CpModel
     // TODO: Cache constant.
     public IntVar NewConstant(long value)
     {
-        return new IntVar(model_, new Domain(value), String.Format("{0}", value));
+        return new IntVar(model_, value, String.Format("{0}", value));
     }
 
     public IntVar NewConstant(long value, string name)
     {
-        return new IntVar(model_, new Domain(value), name);
+        return new IntVar(model_, value, name);
     }
 
     public IntVar NewBoolVar(string name)
@@ -749,7 +749,7 @@ public class CpModel
 
     public void AddVarToObjective(IntVar var)
     {
-        if ((Object)var == null)
+        if (var is null)
             return;
         model_.Objective.Vars.Add(var.Index);
         model_.Objective.Coeffs.Add(model_.Objective.ScalingFactor > 0 ? 1 : -1);
@@ -757,7 +757,7 @@ public class CpModel
 
     public void AddTermToObjective(IntVar var, long coeff)
     {
-        if (coeff == 0 || (Object)var == null)
+        if (coeff == 0 || var is null)
             return;
         model_.Objective.Vars.Add(var.Index);
         model_.Objective.Coeffs.Add(model_.Objective.ScalingFactor > 0 ? coeff : -coeff);
@@ -822,7 +822,7 @@ public class CpModel
     void SetObjective(LinearExpr obj, bool minimize)
     {
         CpObjectiveProto objective = new CpObjectiveProto();
-        if (obj == null)
+        if (obj is null)
         {
             objective.Offset = 0L;
             objective.ScalingFactor = minimize ? 1L : -1;
@@ -881,34 +881,19 @@ public class CpModel
 
     private int ConvertConstant(long value)
     {
-        if (constant_map_.ContainsKey(value))
+        if (constant_map_.TryGetValue(value, out var index))
         {
-            return constant_map_[value];
-        }
-        else
-        {
-            int index = model_.Variables.Count;
-            IntegerVariableProto var = new IntegerVariableProto();
-            var.Domain.Add(value);
-            var.Domain.Add(value);
-            constant_map_.Add(value, index);
-            model_.Variables.Add(var);
             return index;
         }
-    }
 
-    private int GetOrCreateIndex<X>(X x)
-    {
-        if (typeof(X) == typeof(IntVar))
-        {
-            IntVar vx = (IntVar)(Object)x;
-            return vx.Index;
-        }
-        if (typeof(X) == typeof(long) || typeof(X) == typeof(int))
-        {
-            return ConvertConstant(Convert.ToInt64(x));
-        }
-        throw new ArgumentException("Cannot extract index from argument");
+        index = model_.Variables.Count;
+        IntegerVariableProto var = new IntegerVariableProto();
+        var.Domain.Capacity = 2;
+        var.Domain.Add(value);
+        var.Domain.Add(value);
+        constant_map_.Add(value, index);
+        model_.Variables.Add(var);
+        return index;
     }
 
     private LinearExpr GetLinearExpr<X>(X x)
