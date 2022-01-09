@@ -142,38 +142,40 @@ public class CpSolver
             if (coeff == 0)
                 continue;
 
-            if (expr is ProductCst)
+            switch (expr)
             {
-                ProductCst p = (ProductCst)expr;
-                if (p.Coeff != 0)
+                case ProductCst p:
                 {
-                    exprs.Add(p.Expr);
-                    coeffs.Add(p.Coeff * coeff);
+                    if (p.Coeff != 0)
+                    {
+                        exprs.Add(p.Expr);
+                        coeffs.Add(p.Coeff * coeff);
+                    }
+
+                    break;
                 }
-            }
-            else if (expr is SumArray)
-            {
-                SumArray a = (SumArray)expr;
-                constant += coeff * a.Offset;
-                foreach (LinearExpr sub in a.Expressions)
+                case SumArray a:
                 {
-                    exprs.Add(sub);
-                    coeffs.Add(coeff);
+                    constant += coeff * a.Offset;
+                    foreach (LinearExpr sub in a.Expressions)
+                    {
+                        exprs.Add(sub);
+                        coeffs.Add(coeff);
+                    }
+
+                    break;
                 }
-            }
-            else if (expr is IntVar)
-            {
-                int index = expr.Index;
-                long value = index >= 0 ? response_.Solution[index] : -response_.Solution[-index - 1];
-                constant += coeff * value;
-            }
-            else if (expr is NotBooleanVariable)
-            {
-                throw new ArgumentException("Cannot evaluate a literal in an integer expression.");
-            }
-            else
-            {
-                throw new ArgumentException("Cannot evaluate '" + expr.ToString() + "' in an integer expression");
+                case IntVar:
+                {
+                    int index = expr.Index;
+                    long value = index >= 0 ? response_.Solution[index] : -response_.Solution[-index - 1];
+                    constant += coeff * value;
+                    break;
+                }
+                case NotBooleanVariable:
+                    throw new ArgumentException("Cannot evaluate a literal in an integer expression.");
+                default:
+                    throw new ArgumentException("Cannot evaluate '" + expr.ToString() + "' in an integer expression");
             }
         }
         return constant;

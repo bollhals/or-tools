@@ -36,18 +36,16 @@ public class CpSolverSolutionCallback : SolutionCallback
             if (coeff == 0)
                 continue;
 
-            if (expr is ProductCst)
+            if (expr is ProductCst p)
             {
-                ProductCst p = (ProductCst)expr;
                 if (p.Coeff != 0)
                 {
                     exprs.Add(p.Expr);
                     coeffs.Add(p.Coeff * coeff);
                 }
             }
-            else if (expr is SumArray)
+            else if (expr is SumArray a)
             {
-                SumArray a = (SumArray)expr;
                 constant += coeff * a.Offset;
                 foreach (LinearExpr sub in a.Expressions)
                 {

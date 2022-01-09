@@ -232,9 +232,8 @@ public class LinearExpr
         {
             return e;
         }
-        else if (e is ProductCst)
+        else if (e is ProductCst p)
         {
-            ProductCst p = (ProductCst)e;
             return new ProductCst(p.Expr, p.Coeff * v);
         }
         else
@@ -263,24 +262,21 @@ public class LinearExpr
             if (coeff == 0 || expr is null)
                 continue;
 
-            if (expr is ProductCst)
+            if (expr is ProductCst p)
             {
-                ProductCst p = (ProductCst)expr;
                 if (p.Coeff != 0)
                 {
                     exprs.Add(p.Expr);
                     coeffs.Add(p.Coeff * coeff);
                 }
             }
-            else if (expr is SumArray)
+            else if (expr is SumArray a)
             {
-                SumArray a = (SumArray)expr;
                 constant += coeff * a.Offset;
                 foreach (LinearExpr sub in a.Expressions)
                 {
-                    if (sub is IntVar)
+                    if (sub is IntVar i)
                     {
-                        IntVar i = (IntVar)sub;
                         if (dict.ContainsKey(i))
                         {
                             dict[i] += coeff;
@@ -290,19 +286,17 @@ public class LinearExpr
                             dict.Add(i, coeff);
                         }
                     }
-                    else if (sub is ProductCst && ((ProductCst)sub).Expr is IntVar)
+                    else if (sub is ProductCst sub_prod && sub_prod.Expr is IntVar sub_i)
                     {
-                        ProductCst sub_prod = (ProductCst)sub;
-                        IntVar i = (IntVar)sub_prod.Expr;
                         long sub_coeff = sub_prod.Coeff;
 
-                        if (dict.ContainsKey(i))
+                        if (dict.ContainsKey(sub_i))
                         {
-                            dict[i] += coeff * sub_coeff;
+                            dict[sub_i] += coeff * sub_coeff;
                         }
                         else
                         {
-                            dict.Add(i, coeff * sub_coeff);
+                            dict.Add(sub_i, coeff * sub_coeff);
                         }
                     }
                     else
@@ -312,14 +306,12 @@ public class LinearExpr
                     }
                 }
             }
-            else if (expr is ConstantExpr)
+            else if (expr is ConstantExpr cte)
             {
-                ConstantExpr cte = (ConstantExpr)expr;
                 constant += coeff * cte.Value;
             }
-            else if (expr is IntVar)
+            else if (expr is IntVar i)
             {
-                IntVar i = (IntVar)expr;
                 if (dict.ContainsKey(i))
                 {
                     dict[i] += coeff;
@@ -329,16 +321,16 @@ public class LinearExpr
                     dict.Add(i, coeff);
                 }
             }
-            else if (expr is NotBooleanVariable)
+            else if (expr is NotBooleanVariable not_bool)
             {
-                IntVar i = ((NotBooleanVariable)expr).NotVar();
-                if (dict.ContainsKey(i))
+                IntVar bool_i = not_bool.NotVar();
+                if (dict.ContainsKey(bool_i))
                 {
-                    dict[i] -= coeff;
+                    dict[bool_i] -= coeff;
                 }
                 else
                 {
-                    dict.Add(i, -coeff);
+                    dict.Add(bool_i, -coeff);
                 }
                 constant += coeff;
             }
