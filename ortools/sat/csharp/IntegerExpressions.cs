@@ -31,7 +31,7 @@ internal static class HelperExtensions
     public static void AddOrIncrement(this Dictionary<IntVar, long> dict, IntVar key, long increment)
     {
 #if NET6_0_OR_GREATER
-        CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out _) += increment;
+        System.Runtime.InteropServices.CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out _) += increment;
 #else
         if (dict.TryGetValue(key, out var value))
         {
