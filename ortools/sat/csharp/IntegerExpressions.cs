@@ -517,7 +517,7 @@ public class SumArray : LinearExpr
 
     public override string ShortString()
     {
-        return String.Format("({0})", ToString());
+        return $"({ToString()})";
     }
 
     public override string ToString()
@@ -529,14 +529,14 @@ public class SumArray : LinearExpr
                 continue;
             if (!String.IsNullOrEmpty(result))
             {
-                result += String.Format(" + ");
+                result += " + ";
             }
 
             result += expr.ShortString();
         }
         if (offset_ != 0)
         {
-            result += String.Format(" + {0}", offset_);
+            result += $" + {offset_}";
         }
         return result;
     }
@@ -561,12 +561,12 @@ public class ConstantExpr : LinearExpr
 
     public override string ShortString()
     {
-        return String.Format("{0}", value_);
+        return value_.ToString();
     }
 
     public override string ToString()
     {
-        return String.Format("ConstantExpr({0})", value_);
+        return $"ConstantExpr({value_})";
     }
 
     private long value_;
@@ -694,7 +694,7 @@ public class NotBooleanVariable : LinearExpr, ILiteral
 
     public override string ShortString()
     {
-        return String.Format("Not({0})", boolvar_.ShortString());
+        return $"Not({boolvar_.ShortString()})";
     }
 
     private IntVar boolvar_;
@@ -766,15 +766,15 @@ public class BoundedLinearExpression
         switch (type_)
         {
         case Type.BoundExpression:
-            return String.Format("{0} <= {1} <= {2}", lb_, left_, ub_);
+            return $"{lb_} <= {left_} <= {ub_}";
         case Type.VarEqVar:
-            return String.Format("{0} == {1}", left_, right_);
+            return $"{left_} == {right_}";
         case Type.VarDiffVar:
-            return String.Format("{0} != {1}", left_, right_);
+            return $"{left_} != {right_}";
         case Type.VarEqCst:
-            return String.Format("{0} == {1}", left_, lb_);
+            return $"{left_} == {lb_}";
         case Type.VarDiffCst:
-            return String.Format("{0} != {1}", left_, lb_);
+            return $"{left_} != {lb_}";
         default:
             throw new ArgumentException("Wrong mode in BoundedLinearExpression.");
         }

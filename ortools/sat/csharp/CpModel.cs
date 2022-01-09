@@ -58,7 +58,7 @@ public class CpModel
     // TODO: Cache constant.
     public IntVar NewConstant(long value)
     {
-        return new IntVar(model_, value, String.Format("{0}", value));
+        return new IntVar(model_, value, value.ToString());
     }
 
     public IntVar NewConstant(long value, string name)
