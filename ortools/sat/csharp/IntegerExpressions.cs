@@ -15,12 +15,33 @@ namespace Google.OrTools.Sat
 {
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Google.OrTools.Util;
 
 public interface ILiteral
 {
     ILiteral Not();
     int GetIndex();
+}
+
+internal static class HelperExtensions
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void AddOrIncrement(this Dictionary<IntVar, long> dict, IntVar key, long increment)
+    {
+#if NET6_0_OR_GREATER
+        CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out _) += increment;
+#else
+        if (dict.TryGetValue(key, out var value))
+        {
+            dict[key] = value + increment;
+        }
+        else
+        {
+            dict.Add(key, increment);
+        }
+#endif
+    }
 }
 
 // Holds a linear expression.
@@ -277,27 +298,11 @@ public class LinearExpr
                 {
                     if (sub is IntVar i)
                     {
-                        if (dict.ContainsKey(i))
-                        {
-                            dict[i] += coeff;
-                        }
-                        else
-                        {
-                            dict.Add(i, coeff);
-                        }
+                        dict.AddOrIncrement(i, coeff);
                     }
                     else if (sub is ProductCst sub_prod && sub_prod.Expr is IntVar sub_i)
                     {
-                        long sub_coeff = sub_prod.Coeff;
-
-                        if (dict.ContainsKey(sub_i))
-                        {
-                            dict[sub_i] += coeff * sub_coeff;
-                        }
-                        else
-                        {
-                            dict.Add(sub_i, coeff * sub_coeff);
-                        }
+                        dict.AddOrIncrement(sub_i, coeff * sub_prod.Coeff);
                     }
                     else
                     {
@@ -312,26 +317,12 @@ public class LinearExpr
             }
             else if (expr is IntVar i)
             {
-                if (dict.ContainsKey(i))
-                {
-                    dict[i] += coeff;
-                }
-                else
-                {
-                    dict.Add(i, coeff);
-                }
+                dict.AddOrIncrement(i, coeff);
             }
             else if (expr is NotBooleanVariable not_bool)
             {
                 IntVar bool_i = not_bool.NotVar();
-                if (dict.ContainsKey(bool_i))
-                {
-                    dict[bool_i] -= coeff;
-                }
-                else
-                {
-                    dict.Add(bool_i, -coeff);
-                }
+                dict.AddOrIncrement(bool_i, -coeff);
                 constant += coeff;
             }
             else
