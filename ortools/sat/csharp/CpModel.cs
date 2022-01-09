@@ -80,14 +80,20 @@ public class CpModel
     {
         Dictionary<IntVar, long> dict = new Dictionary<IntVar, long>();
         long constant = LinearExpr.GetVarValueMap(linear_expr, 1L, dict);
-        Constraint ct = new Constraint(model_);
         LinearConstraintProto linear = new LinearConstraintProto();
+
+        var count = dict.Count;
+        linear.Domain.Capacity = count;
+        linear.Coeffs.Capacity = count;
         foreach (KeyValuePair<IntVar, long> term in dict)
         {
             linear.Vars.Add(term.Key.Index);
             linear.Coeffs.Add(term.Value);
         }
-        foreach (long value in domain.FlattenedIntervals())
+
+        var intervals = domain.FlattenedIntervals();
+        linear.Domain.Capacity = intervals.Length;
+        foreach (long value in intervals)
         {
             if (value == Int64.MinValue || value == Int64.MaxValue)
             {
@@ -98,6 +104,8 @@ public class CpModel
                 linear.Domain.Add(value - constant);
             }
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.Linear = linear;
         return ct;
     }
@@ -130,93 +138,112 @@ public class CpModel
 
     public Constraint AddAllDifferent(IEnumerable<IntVar> vars)
     {
-        Constraint ct = new Constraint(model_);
         AllDifferentConstraintProto alldiff = new AllDifferentConstraintProto();
+        alldiff.Exprs.TrySetCapacity(vars);
         foreach (IntVar var in vars)
         {
             alldiff.Exprs.Add(GetLinearExpressionProto(var));
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.AllDiff = alldiff;
         return ct;
     }
 
     public Constraint AddAllDifferent(IEnumerable<LinearExpr> exprs)
     {
-        Constraint ct = new Constraint(model_);
         AllDifferentConstraintProto alldiff = new AllDifferentConstraintProto();
+        alldiff.Exprs.TrySetCapacity(exprs);
         foreach (LinearExpr expr in exprs)
         {
             alldiff.Exprs.Add(GetLinearExpressionProto(expr));
         }
 
+        Constraint ct = new Constraint(model_);
         ct.Proto.AllDiff = alldiff;
         return ct;
     }
 
     public Constraint AddElement(IntVar index, IEnumerable<IntVar> vars, IntVar target)
     {
-        Constraint ct = new Constraint(model_);
         ElementConstraintProto element = new ElementConstraintProto();
         element.Index = index.Index;
+        element.Vars.TrySetCapacity(vars);
         foreach (IntVar var in vars)
         {
             element.Vars.Add(var.Index);
         }
         element.Target = target.Index;
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.Element = element;
         return ct;
     }
 
     public Constraint AddElement(IntVar index, IEnumerable<long> values, IntVar target)
     {
-        Constraint ct = new Constraint(model_);
         ElementConstraintProto element = new ElementConstraintProto();
         element.Index = index.Index;
+        element.Vars.TrySetCapacity(values);
         foreach (long value in values)
         {
             element.Vars.Add(ConvertConstant(value));
         }
         element.Target = target.Index;
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.Element = element;
         return ct;
     }
 
     public Constraint AddElement(IntVar index, IEnumerable<int> values, IntVar target)
     {
-        Constraint ct = new Constraint(model_);
         ElementConstraintProto element = new ElementConstraintProto();
         element.Index = index.Index;
+        element.Vars.TrySetCapacity(values);
         foreach (int value in values)
         {
             element.Vars.Add(ConvertConstant(value));
         }
         element.Target = target.Index;
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.Element = element;
         return ct;
     }
 
     public Constraint AddCircuit(IEnumerable<Tuple<int, int, ILiteral>> arcs)
     {
-        Constraint ct = new Constraint(model_);
         CircuitConstraintProto circuit = new CircuitConstraintProto();
+        if (arcs is ICollection<Tuple<int, int, ILiteral>> collection)
+        {
+            var count = collection.Count;
+            circuit.Tails.Capacity = count;
+            circuit.Heads.Capacity = count;
+            circuit.Literals.Capacity = count;
+        }
         foreach (var arc in arcs)
         {
             circuit.Tails.Add(arc.Item1);
             circuit.Heads.Add(arc.Item2);
             circuit.Literals.Add(arc.Item3.GetIndex());
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.Circuit = circuit;
         return ct;
     }
 
     public Constraint AddAllowedAssignments(IEnumerable<IntVar> vars, long[,] tuples)
     {
-        Constraint ct = new Constraint(model_);
         TableConstraintProto table = new TableConstraintProto();
+        table.Vars.TrySetCapacity(vars);
         foreach (IntVar var in vars)
         {
             table.Vars.Add(var.Index);
         }
+
+        table.Values.Capacity = tuples.Length;
         for (int i = 0; i < tuples.GetLength(0); ++i)
         {
             for (int j = 0; j < tuples.GetLength(1); ++j)
@@ -224,6 +251,8 @@ public class CpModel
                 table.Values.Add(tuples[i, j]);
             }
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.Table = table;
         return ct;
     }
@@ -238,24 +267,28 @@ public class CpModel
     public Constraint AddAutomaton(IEnumerable<IntVar> vars, long starting_state, long[,] transitions,
                                    IEnumerable<long> final_states)
     {
-        Constraint ct = new Constraint(model_);
         AutomatonConstraintProto aut = new AutomatonConstraintProto();
+        aut.Vars.TrySetCapacity(vars);
         foreach (IntVar var in vars)
         {
             aut.Vars.Add(var.Index);
         }
+
         aut.StartingState = starting_state;
-        foreach (long f in final_states)
-        {
-            aut.FinalStates.Add(f);
-        }
-        for (int i = 0; i < transitions.GetLength(0); ++i)
+        aut.FinalStates.AddRange(final_states);
+
+        var transitionCount = transitions.GetLength(0);
+        aut.TransitionTail.Capacity = transitionCount;
+        aut.TransitionLabel.Capacity = transitionCount;
+        aut.TransitionHead.Capacity = transitionCount;
+        for (int i = 0; i < transitionCount; ++i)
         {
             aut.TransitionTail.Add(transitions[i, 0]);
             aut.TransitionLabel.Add(transitions[i, 1]);
             aut.TransitionHead.Add(transitions[i, 2]);
         }
 
+        Constraint ct = new Constraint(model_);
         ct.Proto.Automaton = aut;
         return ct;
     }
@@ -263,16 +296,22 @@ public class CpModel
     public Constraint AddAutomaton(IEnumerable<IntVar> vars, long starting_state,
                                    IEnumerable<Tuple<long, long, long>> transitions, IEnumerable<long> final_states)
     {
-        Constraint ct = new Constraint(model_);
         AutomatonConstraintProto aut = new AutomatonConstraintProto();
+        aut.Vars.TrySetCapacity(vars);
         foreach (IntVar var in vars)
         {
             aut.Vars.Add(var.Index);
         }
+
         aut.StartingState = starting_state;
-        foreach (long f in final_states)
+        aut.FinalStates.AddRange(final_states);
+
+        if (transitions is ICollection<Tuple<long, long, long>> transitionCollection)
         {
-            aut.FinalStates.Add(f);
+            var transitionCount = transitionCollection.Count;
+            aut.TransitionTail.Capacity = transitionCount;
+            aut.TransitionLabel.Capacity = transitionCount;
+            aut.TransitionHead.Capacity = transitionCount;
         }
         foreach (Tuple<long, long, long> transition in transitions)
         {
@@ -281,22 +320,27 @@ public class CpModel
             aut.TransitionTail.Add(transition.Item3);
         }
 
+        Constraint ct = new Constraint(model_);
         ct.Proto.Automaton = aut;
         return ct;
     }
 
     public Constraint AddInverse(IEnumerable<IntVar> direct, IEnumerable<IntVar> reverse)
     {
-        Constraint ct = new Constraint(model_);
         InverseConstraintProto inverse = new InverseConstraintProto();
+        inverse.FDirect.TrySetCapacity(direct);
         foreach (IntVar var in direct)
         {
             inverse.FDirect.Add(var.Index);
         }
+
+        inverse.FInverse.TrySetCapacity(reverse);
         foreach (IntVar var in reverse)
         {
             inverse.FInverse.Add(var.Index);
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.Inverse = inverse;
         return ct;
     }
@@ -304,12 +348,14 @@ public class CpModel
     public Constraint AddReservoirConstraint<I>(IEnumerable<IntVar> times, IEnumerable<I> levelChanges, long minLevel,
                                                 long maxLevel)
     {
-        Constraint ct = new Constraint(model_);
         ReservoirConstraintProto res = new ReservoirConstraintProto();
+        res.TimeExprs.TrySetCapacity(times);
         foreach (IntVar time in times)
         {
             res.TimeExprs.Add(GetLinearExpressionProto(time));
         }
+
+        res.LevelChanges.TrySetCapacity(levelChanges);
         foreach (I d in levelChanges)
         {
             res.LevelChanges.Add(Convert.ToInt64(d));
@@ -317,44 +363,52 @@ public class CpModel
 
         res.MinLevel = minLevel;
         res.MaxLevel = maxLevel;
-        ct.Proto.Reservoir = res;
 
+        Constraint ct = new Constraint(model_);
+        ct.Proto.Reservoir = res;
         return ct;
     }
 
     public Constraint AddReservoirConstraintWithActive<I>(IEnumerable<IntVar> times, IEnumerable<I> levelChanges,
                                                           IEnumerable<IntVar> actives, long minLevel, long maxLevel)
     {
-        Constraint ct = new Constraint(model_);
         ReservoirConstraintProto res = new ReservoirConstraintProto();
+        res.TimeExprs.TrySetCapacity(times);
         foreach (IntVar time in times)
         {
             res.TimeExprs.Add(GetLinearExpressionProto(time));
         }
+
+        res.LevelChanges.TrySetCapacity(levelChanges);
         foreach (I d in levelChanges)
         {
             res.LevelChanges.Add(Convert.ToInt64(d));
         }
+
+        res.ActiveLiterals.TrySetCapacity(actives);
         foreach (IntVar var in actives)
         {
             res.ActiveLiterals.Add(var.Index);
         }
         res.MinLevel = minLevel;
         res.MaxLevel = maxLevel;
-        ct.Proto.Reservoir = res;
 
+        Constraint ct = new Constraint(model_);
+        ct.Proto.Reservoir = res;
         return ct;
     }
 
     public Constraint AddReservoirConstraint<I>(IEnumerable<LinearExpr> times, IEnumerable<I> levelChanges,
                                                 long minLevel, long maxLevel)
     {
-        Constraint ct = new Constraint(model_);
         ReservoirConstraintProto res = new ReservoirConstraintProto();
+        res.TimeExprs.TrySetCapacity(times);
         foreach (LinearExpr time in times)
         {
             res.TimeExprs.Add(GetLinearExpressionProto(time));
         }
+
+        res.LevelChanges.TrySetCapacity(levelChanges);
         foreach (I d in levelChanges)
         {
             res.LevelChanges.Add(Convert.ToInt64(d));
@@ -362,61 +416,74 @@ public class CpModel
 
         res.MinLevel = minLevel;
         res.MaxLevel = maxLevel;
-        ct.Proto.Reservoir = res;
 
+        Constraint ct = new Constraint(model_);
+        ct.Proto.Reservoir = res;
         return ct;
     }
 
     public Constraint AddReservoirConstraintWithActive<I>(IEnumerable<LinearExpr> times, IEnumerable<I> levelChanges,
                                                           IEnumerable<IntVar> actives, long minLevel, long maxLevel)
     {
-        Constraint ct = new Constraint(model_);
         ReservoirConstraintProto res = new ReservoirConstraintProto();
+        res.TimeExprs.TrySetCapacity(times);
         foreach (LinearExpr time in times)
         {
             res.TimeExprs.Add(GetLinearExpressionProto(time));
         }
+
+        res.LevelChanges.TrySetCapacity(levelChanges);
         foreach (I d in levelChanges)
         {
             res.LevelChanges.Add(Convert.ToInt64(d));
         }
+
+        res.ActiveLiterals.TrySetCapacity(actives);
         foreach (IntVar var in actives)
         {
             res.ActiveLiterals.Add(var.Index);
         }
+
         res.MinLevel = minLevel;
         res.MaxLevel = maxLevel;
-        ct.Proto.Reservoir = res;
 
+        Constraint ct = new Constraint(model_);
+        ct.Proto.Reservoir = res;
         return ct;
     }
 
     public void AddMapDomain(IntVar var, IEnumerable<IntVar> bool_vars, long offset = 0)
     {
         int i = 0;
+        int var_index = var.Index;
         foreach (IntVar bool_var in bool_vars)
         {
             int b_index = bool_var.Index;
-            int var_index = var.Index;
 
-            ConstraintProto ct1 = new ConstraintProto();
             LinearConstraintProto lin1 = new LinearConstraintProto();
+            lin1.Vars.Capacity = 1;
             lin1.Vars.Add(var_index);
+            lin1.Coeffs.Capacity = 1;
             lin1.Coeffs.Add(1L);
+            lin1.Domain.Capacity = 2;
             lin1.Domain.Add(offset + i);
             lin1.Domain.Add(offset + i);
+            ConstraintProto ct1 = new ConstraintProto();
             ct1.Linear = lin1;
             ct1.EnforcementLiteral.Add(b_index);
             model_.Constraints.Add(ct1);
 
-            ConstraintProto ct2 = new ConstraintProto();
             LinearConstraintProto lin2 = new LinearConstraintProto();
+            lin1.Vars.Capacity = 1;
             lin2.Vars.Add(var_index);
+            lin1.Coeffs.Capacity = 1;
             lin2.Coeffs.Add(1L);
+            lin1.Domain.Capacity = 4;
             lin2.Domain.Add(Int64.MinValue);
             lin2.Domain.Add(offset + i - 1);
             lin2.Domain.Add(offset + i + 1);
             lin2.Domain.Add(Int64.MaxValue);
+            ConstraintProto ct2 = new ConstraintProto();
             ct2.Linear = lin2;
             ct2.EnforcementLiteral.Add(-b_index - 1);
             model_.Constraints.Add(ct2);
@@ -427,22 +494,26 @@ public class CpModel
 
     public Constraint AddImplication(ILiteral a, ILiteral b)
     {
-        Constraint ct = new Constraint(model_);
         BoolArgumentProto or = new BoolArgumentProto();
+        or.Literals.Capacity = 2;
         or.Literals.Add(a.Not().GetIndex());
         or.Literals.Add(b.GetIndex());
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.BoolOr = or;
         return ct;
     }
 
     public Constraint AddBoolOr(IEnumerable<ILiteral> literals)
     {
-        Constraint ct = new Constraint(model_);
         BoolArgumentProto bool_argument = new BoolArgumentProto();
+        bool_argument.Literals.TrySetCapacity(literals);
         foreach (ILiteral lit in literals)
         {
             bool_argument.Literals.Add(lit.GetIndex());
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.BoolOr = bool_argument;
         return ct;
     }
@@ -454,170 +525,198 @@ public class CpModel
 
     public Constraint AddAtMostOne(IEnumerable<ILiteral> literals)
     {
-        Constraint ct = new Constraint(model_);
         BoolArgumentProto bool_argument = new BoolArgumentProto();
+        bool_argument.Literals.TrySetCapacity(literals);
         foreach (ILiteral lit in literals)
         {
             bool_argument.Literals.Add(lit.GetIndex());
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.AtMostOne = bool_argument;
         return ct;
     }
 
     public Constraint AddExactlyOne(IEnumerable<ILiteral> literals)
     {
-        Constraint ct = new Constraint(model_);
         BoolArgumentProto bool_argument = new BoolArgumentProto();
+        bool_argument.Literals.TrySetCapacity(literals);
         foreach (ILiteral lit in literals)
         {
             bool_argument.Literals.Add(lit.GetIndex());
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.ExactlyOne = bool_argument;
         return ct;
     }
 
     public Constraint AddBoolAnd(IEnumerable<ILiteral> literals)
     {
-        Constraint ct = new Constraint(model_);
         BoolArgumentProto bool_argument = new BoolArgumentProto();
+        bool_argument.Literals.TrySetCapacity(literals);
         foreach (ILiteral lit in literals)
         {
             bool_argument.Literals.Add(lit.GetIndex());
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.BoolAnd = bool_argument;
         return ct;
     }
 
     public Constraint AddBoolXor(IEnumerable<ILiteral> literals)
     {
-        Constraint ct = new Constraint(model_);
         BoolArgumentProto bool_argument = new BoolArgumentProto();
+        bool_argument.Literals.TrySetCapacity(literals);
         foreach (ILiteral lit in literals)
         {
             bool_argument.Literals.Add(lit.GetIndex());
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.BoolXor = bool_argument;
         return ct;
     }
 
     public Constraint AddMinEquality(LinearExpr target, IEnumerable<IntVar> vars)
     {
-        Constraint ct = new Constraint(model_);
         LinearArgumentProto args = new LinearArgumentProto();
+        args.Exprs.TrySetCapacity(vars);
         foreach (IntVar var in vars)
         {
             args.Exprs.Add(GetLinearExpressionProto(var, /*negate=*/true));
         }
         args.Target = GetLinearExpressionProto(target, /*negate=*/true);
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.LinMax = args;
         return ct;
     }
 
     public Constraint AddMinEquality(LinearExpr target, IEnumerable<LinearExpr> exprs)
     {
-        Constraint ct = new Constraint(model_);
         LinearArgumentProto args = new LinearArgumentProto();
+        args.Exprs.TrySetCapacity(exprs);
         foreach (LinearExpr expr in exprs)
         {
             args.Exprs.Add(GetLinearExpressionProto(expr, /*negate=*/true));
         }
         args.Target = GetLinearExpressionProto(target, /*negate=*/true);
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.LinMax = args;
         return ct;
     }
 
     public Constraint AddMaxEquality(IntVar target, IEnumerable<IntVar> vars)
     {
-        Constraint ct = new Constraint(model_);
         LinearArgumentProto args = new LinearArgumentProto();
+        args.Exprs.TrySetCapacity(vars);
         foreach (IntVar var in vars)
         {
             args.Exprs.Add(GetLinearExpressionProto(var));
         }
         args.Target = GetLinearExpressionProto(target);
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.LinMax = args;
         return ct;
     }
 
     public Constraint AddMaxEquality(LinearExpr target, IEnumerable<LinearExpr> exprs)
     {
-        Constraint ct = new Constraint(model_);
         LinearArgumentProto args = new LinearArgumentProto();
+        args.Exprs.TrySetCapacity(exprs);
         foreach (LinearExpr expr in exprs)
         {
             args.Exprs.Add(GetLinearExpressionProto(expr));
         }
         args.Target = GetLinearExpressionProto(target);
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.LinMax = args;
         return ct;
     }
 
     public Constraint AddDivisionEquality<T, N, D>(T target, N num, D denom)
     {
-        Constraint ct = new Constraint(model_);
         LinearArgumentProto args = new LinearArgumentProto();
+        args.Exprs.Capacity = 2;
         args.Exprs.Add(GetLinearExpressionProto(GetLinearExpr(num)));
         args.Exprs.Add(GetLinearExpressionProto(GetLinearExpr(denom)));
         args.Target = GetLinearExpressionProto(GetLinearExpr(target));
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.IntDiv = args;
         return ct;
     }
 
     public Constraint AddAbsEquality(LinearExpr target, LinearExpr expr)
     {
-        Constraint ct = new Constraint(model_);
         LinearArgumentProto args = new LinearArgumentProto();
+        args.Exprs.Capacity = 2;
         args.Exprs.Add(GetLinearExpressionProto(expr));
         args.Exprs.Add(GetLinearExpressionProto(expr, /*negate=*/true));
         args.Target = GetLinearExpressionProto(target);
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.LinMax = args;
         return ct;
     }
 
     public Constraint AddModuloEquality<T, V, M>(T target, V v, M m)
     {
-        Constraint ct = new Constraint(model_);
         LinearArgumentProto args = new LinearArgumentProto();
+        args.Exprs.Capacity = 2;
         args.Exprs.Add(GetLinearExpressionProto(GetLinearExpr(v)));
         args.Exprs.Add(GetLinearExpressionProto(GetLinearExpr(m)));
         args.Target = GetLinearExpressionProto(GetLinearExpr(target));
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.IntMod = args;
         return ct;
     }
 
     public Constraint AddMultiplicationEquality(LinearExpr target, IEnumerable<IntVar> vars)
     {
-        Constraint ct = new Constraint(model_);
         LinearArgumentProto args = new LinearArgumentProto();
         args.Target = GetLinearExpressionProto(target);
+        args.Exprs.TrySetCapacity(vars);
         foreach (IntVar var in vars)
         {
             args.Exprs.Add(GetLinearExpressionProto(var));
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.IntProd = args;
         return ct;
     }
 
     public Constraint AddMultiplicationEquality(LinearExpr target, IEnumerable<LinearExpr> exprs)
     {
-        Constraint ct = new Constraint(model_);
         LinearArgumentProto args = new LinearArgumentProto();
         args.Target = GetLinearExpressionProto(target);
+        args.Exprs.TrySetCapacity(exprs);
         foreach (LinearExpr expr in exprs)
         {
             args.Exprs.Add(GetLinearExpressionProto(expr));
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.IntProd = args;
         return ct;
     }
 
     public Constraint AddMultiplicationEquality(LinearExpr target, LinearExpr left, LinearExpr right)
     {
-        Constraint ct = new Constraint(model_);
         LinearArgumentProto args = new LinearArgumentProto();
         args.Target = GetLinearExpressionProto(target);
+        args.Exprs.Capacity = 2;
         args.Exprs.Add(GetLinearExpressionProto(left));
         args.Exprs.Add(GetLinearExpressionProto(right));
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.IntProd = args;
         return ct;
     }
@@ -681,47 +780,58 @@ public class CpModel
 
     public Constraint AddNoOverlap(IEnumerable<IntervalVar> intervals)
     {
-        Constraint ct = new Constraint(model_);
         NoOverlapConstraintProto args = new NoOverlapConstraintProto();
+        args.Intervals.TrySetCapacity(intervals);
         foreach (IntervalVar var in intervals)
         {
             args.Intervals.Add(var.GetIndex());
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.NoOverlap = args;
         return ct;
     }
 
     public Constraint AddNoOverlap2D(IEnumerable<IntervalVar> x_intervals, IEnumerable<IntervalVar> y_intervals)
     {
-        Constraint ct = new Constraint(model_);
         NoOverlap2DConstraintProto args = new NoOverlap2DConstraintProto();
+        args.XIntervals.TrySetCapacity(x_intervals);
         foreach (IntervalVar var in x_intervals)
         {
             args.XIntervals.Add(var.GetIndex());
         }
+
+        args.YIntervals.TrySetCapacity(y_intervals);
         foreach (IntervalVar var in y_intervals)
         {
             args.YIntervals.Add(var.GetIndex());
         }
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.NoOverlap2D = args;
         return ct;
     }
 
     public Constraint AddCumulative<D, C>(IEnumerable<IntervalVar> intervals, IEnumerable<D> demands, C capacity)
     {
-        Constraint ct = new Constraint(model_);
         CumulativeConstraintProto cumul = new CumulativeConstraintProto();
+        cumul.Intervals.TrySetCapacity(intervals);
         foreach (IntervalVar var in intervals)
         {
             cumul.Intervals.Add(var.GetIndex());
         }
+
+        cumul.Demands.TrySetCapacity(demands);
         foreach (D demand in demands)
         {
             LinearExpr demandExpr = GetLinearExpr(demand);
             cumul.Demands.Add(GetLinearExpressionProto(demandExpr));
         }
+
         LinearExpr capacityExpr = GetLinearExpr(capacity);
         cumul.Capacity = GetLinearExpressionProto(capacityExpr);
+
+        Constraint ct = new Constraint(model_);
         ct.Proto.Cumulative = cumul;
         return ct;
     }
@@ -775,6 +885,7 @@ public class CpModel
                                     DecisionStrategyProto.Types.DomainReductionStrategy dom_str)
     {
         DecisionStrategyProto ds = new DecisionStrategyProto();
+        ds.Variables.TrySetCapacity(vars);
         foreach (IntVar var in vars)
         {
             ds.Variables.Add(var.Index);
@@ -830,7 +941,10 @@ public class CpModel
         else if (obj is IntVar)
         {
             objective.Offset = 0L;
+            objective.Vars.Capacity = 1;
             objective.Vars.Add(obj.Index);
+
+            objective.Coeffs.Capacity = 1;
             if (minimize)
             {
                 objective.Coeffs.Add(1L);
@@ -856,6 +970,10 @@ public class CpModel
                 objective.ScalingFactor = -1L;
                 objective.Offset = -constant;
             }
+
+            var dictCount = dict.Count;
+            objective.Vars.Capacity = dictCount;
+            objective.Coeffs.Capacity = dictCount;
             foreach (KeyValuePair<IntVar, long> it in dict)
             {
                 objective.Vars.Add(it.Key.Index);
@@ -864,6 +982,7 @@ public class CpModel
         }
         model_.Objective = objective;
     }
+
     public String ModelStats()
     {
         return CpSatHelper.ModelStats(model_);
@@ -918,7 +1037,11 @@ public class CpModel
         Dictionary<IntVar, long> dict = new Dictionary<IntVar, long>();
         long constant = LinearExpr.GetVarValueMap(expr, 1L, dict);
         long mult = negate ? -1 : 1;
+
         LinearExpressionProto linear = new LinearExpressionProto();
+        var dictCount = dict.Count;
+        linear.Vars.Capacity = dictCount;
+        linear.Coeffs.Capacity = dictCount;
         foreach (KeyValuePair<IntVar, long> term in dict)
         {
             linear.Vars.Add(term.Key.Index);

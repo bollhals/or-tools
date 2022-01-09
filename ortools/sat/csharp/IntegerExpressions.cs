@@ -17,6 +17,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Google.OrTools.Util;
+using Google.Protobuf.Collections;
 
 public interface ILiteral
 {
@@ -41,6 +42,15 @@ internal static class HelperExtensions
             dict.Add(key, increment);
         }
 #endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void TrySetCapacity<TField, TValues>(this RepeatedField<TField> field, IEnumerable<TValues> values)
+    {
+        if (values is ICollection<TValues> collection)
+        {
+            field.Capacity = collection.Count;
+        }
     }
 }
 
@@ -393,7 +403,7 @@ public class SumArray : LinearExpr
 {
     public SumArray(LinearExpr a, LinearExpr b)
     {
-        expressions_ = new List<LinearExpr>();
+        expressions_ = new List<LinearExpr>(2);
         AddExpr(a);
         AddExpr(b);
         offset_ = 0L;
@@ -401,7 +411,7 @@ public class SumArray : LinearExpr
 
     public SumArray(LinearExpr a, long b)
     {
-        expressions_ = new List<LinearExpr>();
+        expressions_ = new List<LinearExpr>(1);
         AddExpr(a);
         offset_ = b;
     }
@@ -569,7 +579,7 @@ public class IntVar : LinearExpr, ILiteral
         index_ = model.Variables.Count;
         var_ = new IntegerVariableProto();
         var_.Name = name;
-        var_.Domain.Add(domain.FlattenedIntervals());
+        var_.Domain.AddRange(domain.FlattenedIntervals());
         model.Variables.Add(var_);
         negation_ = null;
     }
@@ -584,6 +594,7 @@ public class IntVar : LinearExpr, ILiteral
         index_ = model.Variables.Count;
         var_ = new IntegerVariableProto();
         var_.Name = name;
+        var_.Domain.Capacity = 2;
         var_.Domain.Add(lb);
         var_.Domain.Add(ub);
         model.Variables.Add(var_);
